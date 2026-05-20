@@ -1,5 +1,5 @@
 # PyInstaller Windows Packaging Script
-# Packages Aegis Forensic Image Converter into standalone one-directory mode.
+# Packages B.R.I.D.G.E. into standalone one-directory mode.
 
 $VenvPath = Join-Path $PSScriptRoot ".venv"
 $ActivateScript = Join-Path $VenvPath "Scripts\Activate.ps1"
@@ -28,13 +28,13 @@ Write-Host "Beginning PyInstaller execution (One Directory Mode)..." -Foreground
 pyinstaller --onedir `
             --noconsole `
             --add-data "tools;tools" `
-            --name "AegisForensicConverter" `
+            --name "BRIDGE" `
             main.py
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "`n[SUCCESS]: Application successfully packaged." -ForegroundColor Green
-    Write-Host "Distribution output folder: $(Join-Path $PSScriptRoot 'dist\AegisForensicConverter')" -ForegroundColor Cyan
-    Write-Host "External tool binaries have been bundled in dist\AegisForensicConverter\tools\" -ForegroundColor Cyan
+    Write-Host "Distribution output folder: $(Join-Path $PSScriptRoot 'dist\BRIDGE')" -ForegroundColor Cyan
+    Write-Host "External tool binaries have been bundled in dist\BRIDGE\tools\" -ForegroundColor Cyan
 } else {
     Write-Host "`n[ERROR]: Packaging pipeline failed." -ForegroundColor Red
 }

@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class MainWindow(QMainWindow):
-    """The central user interface for Aegis Forensic Image Converter.
+    """The central user interface for B.R.I.D.G.E.
     Acts as both the UI layer and the controller — spawning workers, binding their
     signals to UI slots, and enforcing pre-flight validation before any execution.
     """
@@ -34,7 +34,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         logger.info("Initializing MainWindow.")
 
-        self.setWindowTitle("Aegis Forensic Image Converter")
+        self.setWindowTitle("B.R.I.D.G.E. - Byte-level Routing for Image Data Graphical Extension")
         self.resize(1000, 750)
         self.setMinimumSize(850, 650)
 
@@ -212,13 +212,25 @@ class MainWindow(QMainWindow):
 
         # --- Header ---
         header_layout = QHBoxLayout()
-        title_label = QLabel("Aegis Forensic Image Converter")
+        branding_layout = QVBoxLayout()
+        branding_layout.setSpacing(2)
+
+        title_label = QLabel("B.R.I.D.G.E.")
         title_font = title_label.font()
         title_font.setPointSize(18)
         title_font.setBold(True)
         title_label.setFont(title_font)
         title_label.setStyleSheet("color: #06b6d4;")
-        header_layout.addWidget(title_label)
+        branding_layout.addWidget(title_label)
+
+        subtitle_label = QLabel("Byte-level Routing for Image Data Graphical Extension")
+        subtitle_font = subtitle_label.font()
+        subtitle_font.setPointSize(10)
+        subtitle_label.setFont(subtitle_font)
+        subtitle_label.setStyleSheet("color: #94a3b8;")
+        branding_layout.addWidget(subtitle_label)
+
+        header_layout.addLayout(branding_layout)
         header_layout.addStretch()
 
         self.chk_dry_run = QCheckBox("Dry Run Mode")
@@ -997,8 +1009,9 @@ class MainWindow(QMainWindow):
         logger.info("Opening About dialog.")
         QMessageBox.about(
             self,
-            "About Aegis Forensic Suite",
-            "Aegis Forensic Image Converter & Verifier\n\n"
+            "About B.R.I.D.G.E.",
+            "B.R.I.D.G.E.\n"
+            "Byte-level Routing for Image Data Graphical Extension\n\n"
             "An enterprise desktop tool engineered for automated multi-step forensic conversion "
             "pipelines, safe external CLI tool runners, and chunk-streamed cryptographic "
             "verifications.\n\n"

@@ -549,7 +549,7 @@ class TestHashService(unittest.TestCase):
 
     def test_known_digest_small_file(self):
         """Verifies MD5, SHA-1, and SHA-256 match Python's own hashlib for a small payload."""
-        content = b"Aegis Forensic Image Converter - Phase 9 Hash Test\n"
+        content = b"B.R.I.D.G.E. - Phase 9 Hash Test\n"
         path = self._make_temp_file(content)
 
         expected_md5    = hashlib.md5(content, usedforsecurity=False).hexdigest()

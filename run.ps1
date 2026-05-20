@@ -1,4 +1,4 @@
-# Windows PowerShell run script for Aegis Forensic Image Converter
+# Windows PowerShell run script for B.R.I.D.G.E.
 # Assumes virtual environment is configured in .venv/
 
 $VenvPath = Join-Path $PSScriptRoot ".venv"
@@ -11,7 +11,7 @@ if (Test-Path $ActivateScript) {
     Write-Host "[WARNING]: Python virtual environment not found. Running with global python context." -ForegroundColor Yellow
 }
 
-Write-Host "Launching Aegis Forensic Image Converter..." -ForegroundColor Green
+Write-Host "Launching B.R.I.D.G.E...." -ForegroundColor Green
 python main.py
 
 if ($LASTEXITCODE -ne 0) {

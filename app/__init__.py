@@ -5,4 +5,4 @@
 # Date: 5/18/2026
 # Purpose: Root initialization of the app package.
 
-# Aegis Forensic Suite
+# B.R.I.D.G.E.

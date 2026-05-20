@@ -3,7 +3,7 @@
 # GitHub: https://github.com/rsgrizz
 # Version: v.4
 # Date: 5/19/2026
-# Purpose: Main entry point for the Aegis Forensic Image Converter application.
+# Purpose: Main entry point for the B.R.I.D.G.E. application.
 
 import sys
 import logging
@@ -19,14 +19,14 @@ def main():
     """Main entry point bootstrapping core components, spawning window controls,
     and launching Qt UI event loops.
     """
-    logger.info("Initializing Aegis Forensic Converter system lifecycle...")
+    logger.info("Initializing B.R.I.D.G.E. system lifecycle...")
     
     app = QApplication(sys.argv)
     
     # Configure application metadata
-    app.setApplicationName("Aegis Forensic Converter")
+    app.setApplicationName("B.R.I.D.G.E.")
     app.setApplicationVersion("1.0.0")
-    app.setOrganizationName("Aegis Security")
+    app.setOrganizationName("Randy Grizzelli")
     
     # Instantiate Main GUI Window
     main_window = MainWindow()

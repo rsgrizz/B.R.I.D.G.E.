@@ -1,4 +1,6 @@
-# Aegis Forensic Image Converter
+# B.R.I.D.G.E.
+
+**Byte-level Routing for Image Data Graphical Extension**
 
 A professional, high-performance Windows desktop application designed to convert, compile, verify, and carve digital forensic disk images. The application is built entirely in **Python 3** using the enterprise **PySide6** (Qt for Python) native framework.
 
@@ -16,7 +18,7 @@ A professional, high-performance Windows desktop application designed to convert
 
 ## Directory Layout
 ```
-Forensic Image Converter/
+B.R.I.D.G.E./
 ├── main.py                    # Application bootstrapper & event loop
 ├── app/
 │   ├── core/                  # Pure Python core services (No Qt)

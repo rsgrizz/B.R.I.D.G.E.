@@ -5,4 +5,4 @@
 # Date: 5/18/2026
 # Purpose: Initialization of the background worker threads package.
 
-# Forensic Image Converter Background Workers
+# B.R.I.D.G.E. Background Workers

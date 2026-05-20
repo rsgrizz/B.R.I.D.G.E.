@@ -1,0 +1,46 @@
+# Aegis Forensic Image Converter — .gitignore
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Distribution / packaging
+dist/
+build/
+*.spec
+*.egg-info/
+
+# PyInstaller output
+*.exe
+*.app
+
+# Logs (runtime only — not committed)
+logs/
+
+# External tools (place binaries here manually — not committed)
+tools/
+
+# Test & coverage artifacts
+.coverage
+htmlcov/
+.pytest_cache/
+*.log
+
+# IDE / editor
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS generated
+Thumbs.db
+Desktop.ini
+.DS_Store

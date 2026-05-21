@@ -7,8 +7,10 @@
 
 import sys
 import logging
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 from app.utils.logging_config import setup_logging
+from app.utils.paths import AppPaths
 from app.ui.main_window import MainWindow
 
 # Initialize system trace logging
@@ -27,6 +29,10 @@ def main():
     app.setApplicationName("B.R.I.D.G.E.")
     app.setApplicationVersion("1.0.0")
     app.setOrganizationName("Randy Grizzelli")
+
+    icon_path = AppPaths.get_asset_path("bridge.ico")
+    if icon_path.exists():
+        app.setWindowIcon(QIcon(str(icon_path)))
     
     # Instantiate Main GUI Window
     main_window = MainWindow()

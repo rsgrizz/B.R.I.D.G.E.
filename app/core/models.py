@@ -110,3 +110,82 @@ class HashResult:
     elapsed_time: float
     success: bool
     error_message: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Phase 10 — Pre-flight Validation Models
+# ---------------------------------------------------------------------------
+
+class ValidationSeverity(Enum):
+    """Severity level for a single validation finding."""
+    ERROR   = "ERROR"      # Hard stop — conversion must not proceed
+    WARNING = "WARNING"    # Soft check — user may acknowledge and continue
+    INFO    = "INFO"       # Informational only
+
+
+class ValidationCode(Enum):
+    """Machine-readable codes for every distinct validation check."""
+    SOURCE_NOT_FOUND          = "SOURCE_NOT_FOUND"
+    SOURCE_NOT_READABLE       = "SOURCE_NOT_READABLE"
+    SOURCE_EMPTY              = "SOURCE_EMPTY"
+    DEST_DIR_NOT_FOUND        = "DEST_DIR_NOT_FOUND"
+    DEST_DIR_NOT_CREATABLE    = "DEST_DIR_NOT_CREATABLE"
+    DEST_DIR_NOT_WRITABLE     = "DEST_DIR_NOT_WRITABLE"
+    OUTPUT_ALREADY_EXISTS     = "OUTPUT_ALREADY_EXISTS"
+    INTERMEDIATE_PATH_INVALID = "INTERMEDIATE_PATH_INVALID"
+    INSUFFICIENT_DISK_SPACE   = "INSUFFICIENT_DISK_SPACE"
+    DISK_SPACE_LOW_WARNING    = "DISK_SPACE_LOW_WARNING"
+    NO_PLAN                   = "NO_PLAN"
+    OK                        = "OK"
+
+
+@dataclass(frozen=True)
+class ValidationMessage:
+    """A single finding produced by PreflightValidator."""
+    severity: ValidationSeverity
+    code:     ValidationCode
+    message:  str              # Human-readable description
+
+
+@dataclass(frozen=True)
+class EstimatedSpaceRequirement:
+    """Space estimate for a planned conversion pipeline."""
+    source_size_bytes:      int    # Actual source file size on disk
+    num_steps:              int    # Number of ConversionStep objects in the plan
+    raw_estimate_bytes:     int    # source_size × (steps + 1) before margin
+    safety_margin_bytes:    int    # The buffer added on top
+    total_required_bytes:   int    # raw_estimate + safety_margin
+    available_bytes:        int    # shutil.disk_usage(dest_path).free
+    has_enough_space:       bool   # total_required_bytes <= available_bytes
+
+
+@dataclass(frozen=True)
+class ValidationResult:
+    """Structured outcome of a full pre-flight validation pass.
+
+    ``passed`` is True only when there are no ERROR-severity messages.
+    WARNING messages are collected but do not block execution on their own.
+    ``overwrite_required`` signals that the GUI must ask the user for
+    explicit permission before proceeding.
+    """
+    passed:              bool
+    messages:            List[ValidationMessage]
+    overwrite_required:  bool                       = False
+    space_estimate:      Optional[object]           = None   # EstimatedSpaceRequirement | None
+
+    @property
+    def errors(self) -> List[ValidationMessage]:
+        return [m for m in self.messages if m.severity == ValidationSeverity.ERROR]
+
+    @property
+    def warnings(self) -> List[ValidationMessage]:
+        return [m for m in self.messages if m.severity == ValidationSeverity.WARNING]
+
+
+@dataclass(frozen=True)
+class DryRunResult:
+    """Result of a dry-run execution — validation was performed but no tool was invoked."""
+    validation:        ValidationResult
+    plan_report:       str               # generate_dry_run_report() output
+    planned_commands:  List[List[str]]   # Each step's fully-resolved command_args
+    passed:            bool              # True only if validation.passed is True

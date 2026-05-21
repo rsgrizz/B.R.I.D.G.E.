@@ -1,4 +1,4 @@
-# Aegis Forensic Image Converter — .gitignore
+# B.R.I.D.G.E. - .gitignore
 
 # Python bytecode
 __pycache__/
@@ -22,10 +22,10 @@ build/
 *.exe
 *.app
 
-# Logs (runtime only — not committed)
+# Logs (runtime only - not committed)
 logs/
 
-# External tools (place binaries here manually — not committed)
+# External tools (place binaries here manually - not committed)
 tools/
 
 # Test & coverage artifacts

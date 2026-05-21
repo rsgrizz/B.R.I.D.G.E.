@@ -8,16 +8,19 @@
 import logging
 from pathlib import Path
 from PySide6.QtCore import Qt, QThreadPool
+from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QLineEdit, QPushButton, QComboBox, QTextEdit,
     QProgressBar, QCheckBox, QFrame, QFileDialog, QMessageBox, QStatusBar
 )
-from app.core.models import FileFormat, ConversionPlan, HashResult, PlannerError
+from app.core.models import FileFormat, ConversionPlan, HashResult, PlannerError, ValidationSeverity
 from app.core.detector import FormatDetector
 from app.core.conversion_planner import ConversionPlanner
 from app.core.conversion_service import ConversionService
+from app.core.preflight_validator import PreflightValidator
 from app.ui.dialogs import DialogHelper
+from app.utils.paths import AppPaths
 from app.workers.conversion_worker import ConversionWorker
 from app.workers.hash_worker import HashWorker
 
@@ -37,6 +40,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("B.R.I.D.G.E. - Byte-level Routing for Image Data Graphical Extension")
         self.resize(1000, 750)
         self.setMinimumSize(850, 650)
+        icon_path = AppPaths.get_asset_path("bridge.ico")
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
 
         # Application state
         self.detected_format: FileFormat = FileFormat.UNKNOWN
@@ -212,6 +218,26 @@ class MainWindow(QMainWindow):
 
         # --- Header ---
         header_layout = QHBoxLayout()
+        header_layout.setSpacing(12)
+
+        logo_path = AppPaths.get_asset_path("bridge_logo.jpeg")
+        if logo_path.exists():
+            logo_pixmap = QPixmap(str(logo_path))
+            if not logo_pixmap.isNull():
+                logo_label = QLabel()
+                logo_label.setObjectName("brandLogo")
+                logo_label.setFixedSize(96, 96)
+                logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                logo_label.setPixmap(
+                    logo_pixmap.scaled(
+                        96,
+                        96,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                )
+                header_layout.addWidget(logo_label)
+
         branding_layout = QVBoxLayout()
         branding_layout.setSpacing(2)
 
@@ -380,9 +406,8 @@ class MainWindow(QMainWindow):
             "QProgressBar::chunk { background-color: #8b5cf6; }"
         )
         hash_progress_row.addWidget(self.hash_progress_bar, 1)
-        hash_layout.addLayout(hash_progress_row)
 
-        # Container for the whole hash row — hidden until verification runs
+        # Container for the whole hash row, hidden until verification runs.
         self._hash_progress_row_widget = QWidget()
         self._hash_progress_row_widget.setLayout(hash_progress_row)
         self._hash_progress_row_widget.setVisible(False)
@@ -609,114 +634,155 @@ class MainWindow(QMainWindow):
     # =========================================================================
 
     def _on_run_clicked(self):
-        """Validates pre-flight conditions and launches the ConversionWorker thread."""
+        """Runs pre-flight validation via PreflightValidator then launches the worker."""
         if not self.current_plan:
             QMessageBox.warning(self, "No Plan", "Please select a valid source and target first.")
             return
 
-        logger.info("Run Conversion button pressed.")
+        logger.info("Run Conversion button pressed — starting pre-flight validation.")
 
-        dest_dir = self.txt_dest_path.text()
-        out_name = self.txt_output_name.text()
+        src_path   = self.txt_source_path.text()
+        dest_dir   = self.txt_dest_path.text()
+        out_name   = self.txt_output_name.text()
         target_fmt = self.cmb_target_format.currentData()
 
         if not target_fmt:
             QMessageBox.warning(self, "No Target", "Please select a target format.")
             return
 
-        dest_file = Path(dest_dir) / f"{out_name}.{target_fmt.value.lower()}"
+        output_filename = f"{out_name}.{target_fmt.value.lower()}"
 
-        # --- Pre-flight: overwrite check ---
-        if dest_file.exists():
-            confirm = DialogHelper.show_overwrite_warning(self, str(dest_file))
-            if not confirm:
-                self._slot_append_log(
-                    "<font color='orange'><b>[WARNING]: Execution cancelled: "
-                    "Overwrite declined by investigator.</b></font>"
-                )
-                return
-
-        # --- Pre-flight: write access check ---
-        if not ConversionService.verify_write_access(dest_dir):
-            QMessageBox.critical(
-                self,
-                "Write Access Denied",
-                f"Cannot write to destination folder:\n{dest_dir}\n\n"
-                "Please choose a different output directory."
-            )
-            return
-
-        # --- Pre-flight: disk space check ---
-        source_size = 0
-        src_path = self.txt_source_path.text()
-        if src_path:
-            try:
-                source_size = Path(src_path).stat().st_size
-            except OSError:
-                pass
-
-        # Estimate: source + all intermediate + output (worst case: n_steps × source_size)
-        estimated_bytes = source_size * (self.current_plan.total_steps + 1)
-        if estimated_bytes > 0 and not ConversionService.check_disk_space(
-            str(dest_file), estimated_bytes
-        ):
-            avail_gb = 0.0
-            try:
-                import shutil
-                _, _, free = shutil.disk_usage(dest_dir)
-                avail_gb = free / (1024 ** 3)
-            except Exception:
-                pass
-            required_gb = estimated_bytes / (1024 ** 3)
-            confirm = DialogHelper.show_space_warning(self, required_gb, avail_gb)
-            if not confirm:
-                self._slot_append_log(
-                    "<font color='orange'><b>[WARNING]: Execution cancelled: "
-                    "Low space safeguard triggered.</b></font>"
-                )
-                return
-
-        # --- Dry run path (no real execution) ---
+        # --- Dry run path (validate + report, no execution) ---
         if self.chk_dry_run.isChecked():
-            self._run_dry_mode()
+            self._run_dry_mode(src_path, dest_dir, output_filename)
             return
 
-        # --- Experimental path confirmation ---
-        if self.current_plan.has_experimental:
-            reply = QMessageBox.warning(
-                self,
-                "Experimental Conversion Path",
-                "This conversion path is marked EXPERIMENTAL.\n\n"
-                "It may fail, produce incomplete output, or behave unexpectedly.\n\n"
-                "Do you wish to proceed?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No
+        # --- First validation pass (overwrite_confirmed=False) ----------
+        result = PreflightValidator.validate(
+            self.current_plan, src_path, dest_dir, output_filename,
+            overwrite_confirmed=False,
+        )
+
+        # Surface all validation messages to the log pane
+        self._render_validation_messages(result)
+
+        # --- Hard errors — cannot proceed --------------------------------
+        if not result.passed and not result.overwrite_required:
+            errors = [m.message for m in result.errors]
+            DialogHelper.show_validation_errors(self, errors)
+            self.status_bar.showMessage("Pre-flight validation failed — conversion blocked.")
+            return
+
+        # --- Overwrite confirmation (blocks until user decides) ----------
+        if result.overwrite_required:
+            output_path = str(Path(dest_dir) / output_filename)
+            approved = DialogHelper.show_overwrite_warning(self, output_path)
+            if not approved:
+                self._slot_append_log(
+                    "<font color='orange'><b>[CANCELLED]: Overwrite declined by investigator. "
+                    "Conversion aborted.</b></font>"
+                )
+                self.status_bar.showMessage("Conversion cancelled — overwrite declined.")
+                return
+
+            # Re-validate with overwrite confirmed; this may still reveal
+            # other hard errors (e.g. disk space) that were evaluated after
+            # the overwrite check in the first pass.
+            result = PreflightValidator.validate(
+                self.current_plan, src_path, dest_dir, output_filename,
+                overwrite_confirmed=True,
             )
-            if reply != QMessageBox.StandardButton.Yes:
+            self._render_validation_messages(result)
+
+            if not result.passed:
+                errors = [m.message for m in result.errors]
+                DialogHelper.show_validation_errors(self, errors)
+                self.status_bar.showMessage("Pre-flight validation failed — conversion blocked.")
+                return
+
+        # --- Disk space soft warning (user may override) -----------------
+        space = result.space_estimate
+        if space and not space.has_enough_space:
+            required_gb  = space.total_required_bytes / (1024 ** 3)
+            available_gb = space.available_bytes       / (1024 ** 3)
+            proceed = DialogHelper.show_space_warning(self, required_gb, available_gb)
+            if not proceed:
+                self._slot_append_log(
+                    "<font color='orange'><b>[CANCELLED]: Low disk space — "
+                    "conversion aborted by investigator.</b></font>"
+                )
+                self.status_bar.showMessage("Conversion cancelled — insufficient disk space.")
+                return
+
+        # --- Experimental path confirmation -----------------------------
+        if self.current_plan.has_experimental:
+            if not DialogHelper.show_experimental_warning(self):
                 self._slot_append_log(
                     "<font color='orange'>[WARNING]: Experimental conversion aborted by investigator.</font>"
                 )
                 return
 
-        # --- Launch real worker ---
+        # --- All checks passed — launch worker -------------------------
         self._launch_conversion_worker()
 
-    def _run_dry_mode(self):
-        """Executes a Dry Run — logs all planned commands without invoking any subprocess."""
+    def _run_dry_mode(self, src_path: str, dest_dir: str, output_filename: str):
+        """Calls PreflightValidator.dry_run() and renders the full result to the log pane.
+        No external tool is invoked.
+        """
         self._slot_append_log(
-            "<font color='#f59e0b'><b>[DRY RUN]: Simulating sequential pipeline execution...</b></font>"
+            "<font color='#f59e0b'><b>[DRY RUN]: Running pre-flight validation and "
+            "generating command plan...</b></font>"
         )
-        for step in self.current_plan.steps:
+
+        dry = PreflightValidator.dry_run(
+            self.current_plan, src_path, dest_dir, output_filename
+        )
+
+        # Render validation messages
+        self._render_validation_messages(dry.validation)
+
+        if not dry.passed:
             self._slot_append_log(
-                f"<font color='#06b6d4'>[DRY RUN] Step {step.step_num}: "
-                f"{' '.join(step.command_args)}</font>"
+                "<font color='red'><b>[DRY RUN BLOCKED]: Validation failed. "
+                "Correct the errors above before running a real conversion.</b></font>"
             )
+            self.status_bar.showMessage("Dry Run blocked — validation errors present.")
+            return
+
+        # Render the space estimate
+        space = dry.validation.space_estimate
+        if space:
+            req_gb  = space.total_required_bytes / (1024 ** 3)
+            avail_gb = space.available_bytes      / (1024 ** 3)
+            self._slot_append_log(
+                f"<font color='#94a3b8'>[DRY RUN]: Estimated space required: "
+                f"<b>{req_gb:.2f} GB</b>  |  Available: <b>{avail_gb:.2f} GB</b>  |  "
+                f"Safety margin: {space.safety_margin_bytes // (1024**2)} MB</font>"
+            )
+
+        # Render each planned step command
+        self._slot_append_log(
+            "<font color='#06b6d4'><b>[DRY RUN]: Planned execution pipeline:</b></font>"
+        )
+        total = self.current_plan.total_steps
+        for i, cmd in enumerate(dry.planned_commands, start=1):
+            step = self.current_plan.steps[i - 1]
+            self._slot_append_log(
+                f"<font color='#06b6d4'>[DRY RUN] Step {i}/{total} "
+                f"({step.source_format.value} &#8594; {step.target_format.value}): "
+                f"<code>{' '.join(cmd)}</code></font>"
+            )
+            if step.is_intermediate:
+                self._slot_append_log(
+                    f"<font color='#64748b'>  &nbsp;&nbsp;Intermediate output: {step.output_file}</font>"
+                )
+
         self.progress_bar.setValue(100)
         self._slot_append_log(
-            "<font color='green'><b>[SUCCESS]: Dry run simulation complete. "
-            "No files were modified.</b></font>"
+            "<font color='green'><b>[DRY RUN COMPLETE]: Validation passed. "
+            "No files were created or modified.</b></font>"
         )
-        self.status_bar.showMessage("Dry Run completed")
+        self.status_bar.showMessage("Dry Run completed — all checks passed.")
 
     def _launch_conversion_worker(self):
         """Creates the ConversionWorker, wires all signals, and starts the thread."""
@@ -1007,13 +1073,49 @@ class MainWindow(QMainWindow):
     def _show_about_dialog(self):
         """Displays About information popup."""
         logger.info("Opening About dialog.")
-        QMessageBox.about(
-            self,
-            "About B.R.I.D.G.E.",
-            "B.R.I.D.G.E.\n"
+        box = QMessageBox(self)
+        box.setWindowTitle("About B.R.I.D.G.E.")
+        logo_path = AppPaths.get_asset_path("bridge_logo.jpeg")
+        if logo_path.exists():
+            logo_pixmap = QPixmap(str(logo_path))
+            if not logo_pixmap.isNull():
+                box.setIconPixmap(
+                    logo_pixmap.scaled(
+                        128,
+                        128,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                )
+        box.setText("B.R.I.D.G.E.")
+        box.setInformativeText(
             "Byte-level Routing for Image Data Graphical Extension\n\n"
-            "An enterprise desktop tool engineered for automated multi-step forensic conversion "
-            "pipelines, safe external CLI tool runners, and chunk-streamed cryptographic "
-            "verifications.\n\n"
-            "Built with PySide6 & Python 3.14."
+            "An enterprise desktop tool engineered for automated multi-step forensic "
+            "conversion pipelines, safe external CLI tool runners, and chunk-streamed "
+            "cryptographic verifications.\n\n"
+            "Built with PySide6 & Python 3."
         )
+        box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        box.exec()
+
+    # =========================================================================
+    # Validation Rendering Helper
+    # =========================================================================
+
+    def _render_validation_messages(self, result) -> None:
+        """Renders all ValidationMessage items from a ValidationResult into the log pane."""
+        for msg in result.messages:
+            if msg.severity == ValidationSeverity.ERROR:
+                self._slot_append_log(
+                    f"<font color='red'><b>[VALIDATION ERROR] [{msg.code.value}]: "
+                    f"{msg.message}</b></font>"
+                )
+            elif msg.severity == ValidationSeverity.WARNING:
+                self._slot_append_log(
+                    f"<font color='orange'>[VALIDATION WARNING] [{msg.code.value}]: "
+                    f"{msg.message}</font>"
+                )
+            elif msg.severity == ValidationSeverity.INFO:
+                self._slot_append_log(
+                    f"<font color='#10b981'>[VALIDATION OK]: {msg.message}</font>"
+                )

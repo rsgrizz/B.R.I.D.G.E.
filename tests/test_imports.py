@@ -21,13 +21,19 @@ from app.core.models import (
     DetectionMethod,
     DetectionResult,
     PlannerError,
-    ConversionEdge
+    ConversionEdge,
+    ValidationSeverity,
+    ValidationCode,
+    ValidationResult,
+    DryRunResult,
+    EstimatedSpaceRequirement,
 )
 from app.core.detector import FormatDetector
 from app.core.conversion_planner import ConversionPlanner
 from app.core.conversion_registry import ConversionRegistry
 from app.core.tool_runner import ToolRunner
 from app.core.hash_service import HashService
+from app.core.preflight_validator import PreflightValidator
 from app.utils.paths import AppPaths
 
 class TestScaffoldWiring(unittest.TestCase):
@@ -710,6 +716,228 @@ class TestHashService(unittest.TestCase):
         # Elapsed time must be recorded (not 0.0 as the old bug had)
         self.assertGreater(result.elapsed_time, 0.0)
         self.assertIsNotNone(result.error_message)
+
+
+class TestPreflightValidator(unittest.TestCase):
+    """Unit tests for PreflightValidator covering all Phase 10 validation scenarios."""
+
+    # ------------------------------------------------------------------
+    # Shared fixtures
+    # ------------------------------------------------------------------
+
+    def setUp(self):
+        """Build a minimal but real RAW->VMDK ConversionPlan for use in tests."""
+        self.plan = ConversionPlanner.plan_conversion(
+            FileFormat.RAW, FileFormat.VMDK,
+            input_path="/fake/source.raw",
+            output_path="/fake/dest/output.vmdk",
+        )
+
+    def _make_source(self, content: bytes = b"\x00" * 1024) -> str:
+        """Creates a temporary source file and registers cleanup."""
+        fd, path = tempfile.mkstemp(suffix=".raw")
+        os.close(fd)
+        with open(path, "wb") as f:
+            f.write(content)
+        self.addCleanup(lambda p=path: os.remove(p) if os.path.exists(p) else None)
+        return path
+
+    def _make_dest_dir(self) -> str:
+        """Creates a temporary destination directory and registers cleanup."""
+        d = tempfile.mkdtemp()
+        self.addCleanup(lambda p=d: __import__('shutil').rmtree(p, ignore_errors=True))
+        return d
+
+    # ------------------------------------------------------------------
+    # Source file checks
+    # ------------------------------------------------------------------
+
+    def test_missing_source_returns_error(self):
+        """SOURCE_NOT_FOUND error when source file does not exist."""
+        dest = self._make_dest_dir()
+        result = PreflightValidator.validate(
+            self.plan, "/nonexistent/source.raw", dest, "out.vmdk"
+        )
+        self.assertFalse(result.passed)
+        codes = [m.code for m in result.messages]
+        self.assertIn(ValidationCode.SOURCE_NOT_FOUND, codes)
+
+    def test_empty_source_emits_warning(self):
+        """SOURCE_EMPTY warning (not error) when source file is 0 bytes."""
+        src = self._make_source(b"")
+        dest = self._make_dest_dir()
+        result = PreflightValidator.validate(self.plan, src, dest, "out.vmdk")
+        # Should not be a hard error
+        error_codes = [m.code for m in result.errors]
+        self.assertNotIn(ValidationCode.SOURCE_NOT_FOUND, error_codes)
+        warn_codes = [m.code for m in result.warnings]
+        self.assertIn(ValidationCode.SOURCE_EMPTY, warn_codes)
+
+    def test_source_not_readable_returns_error(self):
+        """SOURCE_NOT_READABLE error when os.access reports the file is unreadable."""
+        src = self._make_source(b"valid content")
+        dest = self._make_dest_dir()
+        with patch("os.access", return_value=False):
+            result = PreflightValidator.validate(self.plan, src, dest, "out.vmdk")
+        error_codes = [m.code for m in result.errors]
+        self.assertIn(ValidationCode.SOURCE_NOT_READABLE, error_codes)
+
+    # ------------------------------------------------------------------
+    # Destination directory checks
+    # ------------------------------------------------------------------
+
+    def test_missing_dest_dir_returns_error(self):
+        """DEST_DIR_NOT_FOUND / DEST_DIR_NOT_CREATABLE when dest is completely invalid."""
+        src = self._make_source()
+        result = PreflightValidator.validate(
+            self.plan, src, "/Z:/completely/invalid/path/that/cannot/exist", "out.vmdk"
+        )
+        self.assertFalse(result.passed)
+        codes = [m.code for m in result.messages]
+        self.assertTrue(
+            ValidationCode.DEST_DIR_NOT_FOUND in codes
+            or ValidationCode.DEST_DIR_NOT_CREATABLE in codes,
+            msg=f"Expected dest dir error, got codes: {codes}"
+        )
+
+    def test_non_writable_dest_returns_error(self):
+        """DEST_DIR_NOT_WRITABLE error when ConversionService.verify_write_access fails."""
+        src = self._make_source()
+        dest = self._make_dest_dir()
+        with patch(
+            "app.core.preflight_validator.ConversionService.verify_write_access",
+            return_value=False,
+        ):
+            result = PreflightValidator.validate(self.plan, src, dest, "out.vmdk")
+        error_codes = [m.code for m in result.errors]
+        self.assertIn(ValidationCode.DEST_DIR_NOT_WRITABLE, error_codes)
+
+    # ------------------------------------------------------------------
+    # Overwrite check
+    # ------------------------------------------------------------------
+
+    def test_existing_output_sets_overwrite_required(self):
+        """OUTPUT_ALREADY_EXISTS warning and overwrite_required=True when output file exists."""
+        src = self._make_source()
+        dest = self._make_dest_dir()
+        # Pre-create the output file
+        out_path = Path(dest) / "out.vmdk"
+        out_path.write_bytes(b"existing")
+
+        result = PreflightValidator.validate(
+            self.plan, src, dest, "out.vmdk", overwrite_confirmed=False
+        )
+        self.assertTrue(result.overwrite_required)
+        warn_codes = [m.code for m in result.warnings]
+        self.assertIn(ValidationCode.OUTPUT_ALREADY_EXISTS, warn_codes)
+
+    def test_overwrite_confirmed_suppresses_flag(self):
+        """overwrite_confirmed=True suppresses the OUTPUT_ALREADY_EXISTS flag."""
+        src = self._make_source()
+        dest = self._make_dest_dir()
+        out_path = Path(dest) / "out.vmdk"
+        out_path.write_bytes(b"existing")
+
+        result = PreflightValidator.validate(
+            self.plan, src, dest, "out.vmdk", overwrite_confirmed=True
+        )
+        self.assertFalse(result.overwrite_required)
+        codes = [m.code for m in result.messages]
+        self.assertNotIn(ValidationCode.OUTPUT_ALREADY_EXISTS, codes)
+
+    # ------------------------------------------------------------------
+    # Disk space checks
+    # ------------------------------------------------------------------
+
+    def test_disk_space_pass(self):
+        """No INSUFFICIENT_DISK_SPACE error when free space is ample."""
+        src = self._make_source(b"x" * 1024)  # 1 KB
+        dest = self._make_dest_dir()
+        # Mock 10 GB available
+        mock_usage = __import__('collections').namedtuple('DU', ['total','used','free'])
+        with patch("shutil.disk_usage", return_value=mock_usage(10**10, 0, 10**10)):
+            result = PreflightValidator.validate(self.plan, src, dest, "out.vmdk")
+        error_codes = [m.code for m in result.errors]
+        self.assertNotIn(ValidationCode.INSUFFICIENT_DISK_SPACE, error_codes)
+
+    def test_disk_space_fail(self):
+        """INSUFFICIENT_DISK_SPACE error when free space is below the estimate."""
+        src = self._make_source(b"x" * (10 * 1024 * 1024))  # 10 MB source
+        dest = self._make_dest_dir()
+        # Mock only 1 KB available — guaranteed to be less than the estimate
+        mock_usage = __import__('collections').namedtuple('DU', ['total','used','free'])
+        with patch("shutil.disk_usage", return_value=mock_usage(10**10, 0, 1024)):
+            result = PreflightValidator.validate(self.plan, src, dest, "out.vmdk")
+        error_codes = [m.code for m in result.errors]
+        self.assertIn(ValidationCode.INSUFFICIENT_DISK_SPACE, error_codes)
+        self.assertFalse(result.passed)
+
+    # ------------------------------------------------------------------
+    # Dry run
+    # ------------------------------------------------------------------
+
+    def test_dry_run_returns_commands_without_execution(self):
+        """dry_run() returns a DryRunResult with planned_commands and no subprocess call."""
+        src = self._make_source()
+        dest = self._make_dest_dir()
+
+        # Ensure no subprocess is invoked
+        with patch("subprocess.Popen") as mock_popen:
+            dry = PreflightValidator.dry_run(self.plan, src, dest, "out.vmdk")
+            mock_popen.assert_not_called()
+
+        self.assertIsInstance(dry, DryRunResult)
+        self.assertIsInstance(dry.planned_commands, list)
+        self.assertEqual(len(dry.planned_commands), self.plan.total_steps)
+        # Each command must be a non-empty list of strings
+        for cmd in dry.planned_commands:
+            self.assertIsInstance(cmd, list)
+            self.assertTrue(len(cmd) > 0)
+            self.assertIsInstance(cmd[0], str)
+
+    def test_dry_run_with_missing_source_has_passed_false(self):
+        """dry_run() with an invalid source produces passed=False."""
+        dest = self._make_dest_dir()
+        dry = PreflightValidator.dry_run(
+            self.plan, "/nonexistent/file.raw", dest, "out.vmdk"
+        )
+        self.assertFalse(dry.passed)
+        self.assertFalse(dry.validation.passed)
+
+    # ------------------------------------------------------------------
+    # Structured result integrity
+    # ------------------------------------------------------------------
+
+    def test_validation_result_structure(self):
+        """ValidationResult fields are populated correctly on a passing run."""
+        src = self._make_source(b"x" * 4096)
+        dest = self._make_dest_dir()
+        mock_usage = __import__('collections').namedtuple('DU', ['total','used','free'])
+        with patch("shutil.disk_usage", return_value=mock_usage(10**10, 0, 10**10)):
+            result = PreflightValidator.validate(self.plan, src, dest, "out.vmdk")
+
+        self.assertTrue(result.passed)
+        self.assertIsInstance(result.messages, list)
+        self.assertFalse(result.overwrite_required)
+        # space_estimate must be an EstimatedSpaceRequirement
+        self.assertIsNotNone(result.space_estimate)
+        se = result.space_estimate
+        self.assertGreater(se.source_size_bytes, 0)
+        self.assertGreater(se.total_required_bytes, 0)
+        self.assertTrue(se.has_enough_space)
+
+    def test_estimate_space_heuristic(self):
+        """estimate_space total = raw_estimate + 15% safety margin."""
+        source_size = 1_000_000  # 1 MB
+        mock_usage = __import__('collections').namedtuple('DU', ['total','used','free'])
+        with patch("shutil.disk_usage", return_value=mock_usage(10**10, 0, 10**10)):
+            se = PreflightValidator.estimate_space(self.plan, source_size, "/tmp")
+
+        expected_raw = source_size * (self.plan.total_steps + 1)
+        expected_margin = int(expected_raw * 0.15)
+        self.assertEqual(se.raw_estimate_bytes, expected_raw)
+        self.assertEqual(se.safety_margin_bytes, expected_margin)
+        self.assertEqual(se.total_required_bytes, expected_raw + expected_margin)
 
 
 if __name__ == "__main__":

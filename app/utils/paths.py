@@ -17,10 +17,30 @@ class AppPaths:
     def get_app_root() -> Path:
         """Get the root directory of the application."""
         # If running as packaged executable
-        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-            return Path(sys._MEIPASS)
+        if getattr(sys, 'frozen', False):
+            # In PyInstaller, sys.executable points to the packaged executable (e.g. dist/BRIDGE/BRIDGE.exe).
+            # The parent of sys.executable is the clean distribution root folder (dist/BRIDGE/).
+            return Path(sys.executable).resolve().parent
         # Standard local development run
         return Path(__file__).resolve().parent.parent.parent
+
+    @classmethod
+    def get_assets_dir(cls) -> Path:
+        """Get the directory containing bundled application image/icon assets."""
+        candidates = [cls.get_app_root() / "app" / "assets"]
+        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+            candidates.append(Path(sys._MEIPASS) / "app" / "assets")
+
+        for path in candidates:
+            if path.exists():
+                return path
+
+        return candidates[0]
+
+    @classmethod
+    def get_asset_path(cls, filename: str) -> Path:
+        """Resolve a named application asset."""
+        return cls.get_assets_dir() / filename
 
     @classmethod
     def get_tools_dir(cls) -> Path:
@@ -43,7 +63,7 @@ class AppPaths:
     @classmethod
     def get_log_file_path(cls) -> Path:
         """Get the file path for the system log file."""
-        return cls.get_logs_dir() / "forensic_converter.log"
+        return cls.get_logs_dir() / "bridge.log"
 
     @classmethod
     def safe_windows_path(cls, path_str: str) -> str:

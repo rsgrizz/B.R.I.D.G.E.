@@ -75,12 +75,12 @@ class MainWindow(QMainWindow):
                 font-size: 13px;
             }
             QLabel {
-                color: #e5e7eb;
+                color: #f8fafc;
                 font-weight: 500;
             }
             QFrame#container {
-                background-color: #182235;
-                border: 1px solid #3b4a63;
+                background-color: #172235;
+                border: 1px solid #4b5d78;
                 border-radius: 8px;
             }
             QFrame#divider {
@@ -88,10 +88,11 @@ class MainWindow(QMainWindow):
                 max-height: 1px;
             }
             QLineEdit {
-                background-color: #101827;
-                border: 1px solid #64748b;
-                border-radius: 4px;
-                padding: 6px 10px;
+                background-color: #0d1626;
+                border: 1px solid #6b7f9f;
+                border-radius: 5px;
+                padding: 7px 11px;
+                min-height: 18px;
                 color: #f9fafb;
                 selection-background-color: #06b6d4;
                 selection-color: #06121f;
@@ -102,9 +103,9 @@ class MainWindow(QMainWindow):
                 background-color: #0f1b2d;
             }
             QLineEdit:read-only {
-                background-color: #202b3f;
-                border: 1px solid #4b5d78;
-                color: #cbd5e1;
+                background-color: #243149;
+                border: 1px solid #5f7393;
+                color: #e5edf8;
             }
             QPushButton {
                 background-color: #0284c7;
@@ -149,10 +150,11 @@ class MainWindow(QMainWindow):
                 background-color: #334155;
             }
             QComboBox {
-                background-color: #101827;
-                border: 1px solid #64748b;
-                border-radius: 4px;
-                padding: 5px 10px;
+                background-color: #0d1626;
+                border: 1px solid #6b7f9f;
+                border-radius: 5px;
+                padding: 6px 11px;
+                min-height: 20px;
                 color: #f9fafb;
                 selection-background-color: #06b6d4;
                 selection-color: #06121f;
@@ -168,10 +170,10 @@ class MainWindow(QMainWindow):
                 selection-color: #ffffff;
             }
             QTextEdit {
-                background-color: #101827;
-                border: 1px solid #4b5d78;
+                background-color: #0d1626;
+                border: 1px solid #5f7393;
                 border-radius: 6px;
-                padding: 8px;
+                padding: 9px;
                 font-family: "Consolas", "JetBrains Mono", monospace;
                 font-size: 12px;
                 color: #f8fafc;
@@ -182,13 +184,13 @@ class MainWindow(QMainWindow):
                 border: 1px solid #06b6d4;
             }
             QProgressBar {
-                background-color: #1e293b;
-                border: 1px solid #334155;
+                background-color: #243149;
+                border: 1px solid #4b5d78;
                 border-radius: 4px;
                 text-align: center;
                 font-weight: bold;
                 color: #ffffff;
-                height: 18px;
+                min-height: 18px;
             }
             QProgressBar::chunk {
                 background-color: #06b6d4;
@@ -200,7 +202,7 @@ class MainWindow(QMainWindow):
             QCheckBox::indicator {
                 width: 16px;
                 height: 16px;
-                border: 1px solid #475569;
+                border: 1px solid #6b7f9f;
                 border-radius: 3px;
                 background-color: #0f172a;
             }
@@ -263,17 +265,17 @@ class MainWindow(QMainWindow):
 
         title_label = QLabel("B.R.I.D.G.E.")
         title_font = title_label.font()
-        title_font.setPointSize(18)
+        title_font.setPointSize(22)
         title_font.setBold(True)
         title_label.setFont(title_font)
-        title_label.setStyleSheet("color: #06b6d4;")
+        title_label.setStyleSheet("color: #22d3ee; letter-spacing: 0px;")
         branding_layout.addWidget(title_label)
 
         subtitle_label = QLabel("Byte-level Routing for Image Data Graphical Extension")
         subtitle_font = subtitle_label.font()
-        subtitle_font.setPointSize(10)
+        subtitle_font.setPointSize(11)
         subtitle_label.setFont(subtitle_font)
-        subtitle_label.setStyleSheet("color: #94a3b8;")
+        subtitle_label.setStyleSheet("color: #c7d2fe;")
         branding_layout.addWidget(subtitle_label)
 
         header_layout.addLayout(branding_layout)
@@ -310,6 +312,7 @@ class MainWindow(QMainWindow):
         source_input_row = QHBoxLayout()
         self.txt_source_path = QLineEdit()
         self.txt_source_path.setReadOnly(True)
+        self.txt_source_path.setMinimumHeight(34)
         self.txt_source_path.setPlaceholderText(
             "Select raw disk image, virtual partition, or E01 file..."
         )
@@ -336,12 +339,14 @@ class MainWindow(QMainWindow):
 
         form_grid.addWidget(QLabel("Target Format:"), 0, 0)
         self.cmb_target_format = QComboBox()
+        self.cmb_target_format.setMinimumHeight(32)
         self.cmb_target_format.currentIndexChanged.connect(self._on_target_format_changed)
         form_grid.addWidget(self.cmb_target_format, 0, 1)
 
         form_grid.addWidget(QLabel("Destination Dir:"), 1, 0)
         dest_row = QHBoxLayout()
         self.txt_dest_path = QLineEdit()
+        self.txt_dest_path.setMinimumHeight(32)
         self.txt_dest_path.textChanged.connect(self._on_inputs_updated)
         dest_row.addWidget(self.txt_dest_path)
         self.btn_browse_dest = QPushButton("Browse...")
@@ -351,6 +356,7 @@ class MainWindow(QMainWindow):
 
         form_grid.addWidget(QLabel("Output Filename:"), 2, 0)
         self.txt_output_name = QLineEdit()
+        self.txt_output_name.setMinimumHeight(32)
         self.txt_output_name.textChanged.connect(self._on_inputs_updated)
         form_grid.addWidget(self.txt_output_name, 2, 1)
         config_layout.addLayout(form_grid)
@@ -372,6 +378,7 @@ class MainWindow(QMainWindow):
         preview_layout.addWidget(QLabel("<b>Scheduled Conversion Plan:</b>"))
         self.txt_plan_preview = QTextEdit()
         self.txt_plan_preview.setReadOnly(True)
+        self.txt_plan_preview.setMinimumHeight(86)
         self.txt_plan_preview.setPlaceholderText(
             "The execution plan will appear here after selecting source and target..."
         )
@@ -393,21 +400,25 @@ class MainWindow(QMainWindow):
         hash_grid.addWidget(QLabel("Source MD5:"), 0, 0)
         self.txt_hash_src_md5 = QLineEdit()
         self.txt_hash_src_md5.setReadOnly(True)
+        self.txt_hash_src_md5.setMinimumHeight(32)
         hash_grid.addWidget(self.txt_hash_src_md5, 0, 1)
 
         hash_grid.addWidget(QLabel("Source SHA-256:"), 0, 2)
         self.txt_hash_src_sha256 = QLineEdit()
         self.txt_hash_src_sha256.setReadOnly(True)
+        self.txt_hash_src_sha256.setMinimumHeight(32)
         hash_grid.addWidget(self.txt_hash_src_sha256, 0, 3)
 
         hash_grid.addWidget(QLabel("Output MD5:"), 1, 0)
         self.txt_hash_out_md5 = QLineEdit()
         self.txt_hash_out_md5.setReadOnly(True)
+        self.txt_hash_out_md5.setMinimumHeight(32)
         hash_grid.addWidget(self.txt_hash_out_md5, 1, 1)
 
         hash_grid.addWidget(QLabel("Output SHA-256:"), 1, 2)
         self.txt_hash_out_sha256 = QLineEdit()
         self.txt_hash_out_sha256.setReadOnly(True)
+        self.txt_hash_out_sha256.setMinimumHeight(32)
         hash_grid.addWidget(self.txt_hash_out_sha256, 1, 3)
 
         hash_layout.addLayout(hash_grid)
@@ -443,6 +454,7 @@ class MainWindow(QMainWindow):
         log_layout.addWidget(QLabel("<b>Execution Logs & Diagnostic Output:</b>"))
         self.txt_log_pane = QTextEdit()
         self.txt_log_pane.setReadOnly(True)
+        self.txt_log_pane.setMinimumHeight(92)
         self.txt_log_pane.setPlaceholderText("Console logs stream here during processing...")
         log_layout.addWidget(self.txt_log_pane)
 

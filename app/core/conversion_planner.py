@@ -37,6 +37,9 @@ class ConversionPlanner:
         Raises PlannerError if no conversion path is available or if input/output constraints fail.
         """
         logger.info(f"Planning conversion path from {source.value} to {target.value}")
+
+        input_path = cls._normalize_external_path(input_path)
+        output_path = cls._normalize_external_path(output_path)
         
         if source == FileFormat.UNKNOWN or target == FileFormat.UNKNOWN:
             raise PlannerError(f"Cannot convert from/to UNKNOWN format. Source: {source.value}, Target: {target.value}")
@@ -146,3 +149,24 @@ class ConversionPlanner:
         plan = ConversionPlan(steps=steps, estimated_temp_bytes=estimated_temp_bytes)
         logger.info(f"Plan constructed successfully: {len(steps)} step(s). Experimental: {plan.has_experimental}")
         return plan
+
+    @staticmethod
+    def _normalize_external_path(path: str) -> str:
+        """Normalize Windows paths before passing them to external CLI tools.
+
+        Qt file dialogs return paths with forward slashes on Windows. Most tools
+        tolerate that, but libewf/ewfexport treats paths like ``C:/...`` as
+        invalid after applying its extended-path prefix. Keep non-Windows and
+        POSIX-style test paths unchanged.
+        """
+        if not path or os.name != "nt":
+            return path
+
+        stripped = path.strip('"')
+        is_drive_path = len(stripped) >= 3 and stripped[1] == ":" and stripped[2] in ("/", "\\")
+        is_unc_path = stripped.startswith(("//", "\\\\"))
+
+        if is_drive_path or is_unc_path:
+            return os.path.normpath(stripped)
+
+        return path

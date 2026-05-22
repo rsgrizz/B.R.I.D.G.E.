@@ -237,6 +237,34 @@ class TestScaffoldWiring(unittest.TestCase):
         self.assertFalse(s2.experimental)
         self.assertEqual(s2.risk, PathRisk.STABLE)
 
+    def test_planner_normalizes_windows_drive_paths_for_external_tools(self):
+        """Windows-style paths from Qt dialogs must use backslashes for ewfexport."""
+        plan = ConversionPlanner.plan_conversion(
+            FileFormat.E01,
+            FileFormat.VMDK,
+            "C:/Users/RSG/Downloads/2020JimmyWilson.E01",
+            "C:/Users/RSG/Downloads/New folder/2020JimmyWilson_converted.vmdk",
+        )
+
+        if os.name == "nt":
+            self.assertIn(
+                r"C:\Users\RSG\Downloads\2020JimmyWilson.E01",
+                plan.steps[0].command_args,
+            )
+            self.assertIn(
+                r"C:\Users\RSG\Downloads\New folder\2020JimmyWilson_converted_temp_step1",
+                plan.steps[0].command_args,
+            )
+            self.assertEqual(
+                plan.steps[1].command_args[-2],
+                r"C:\Users\RSG\Downloads\New folder\2020JimmyWilson_converted_temp_step1.raw",
+            )
+        else:
+            self.assertIn(
+                "C:/Users/RSG/Downloads/2020JimmyWilson.E01",
+                plan.steps[0].command_args,
+            )
+
 
 class TestFormatDetector(unittest.TestCase):
     """Rigorous unit test suite validating binary signature checks and extension fallbacks."""

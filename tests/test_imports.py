@@ -217,8 +217,8 @@ class TestScaffoldWiring(unittest.TestCase):
         # Intermediate temp file should be co-located with target path
         self.assertEqual(s1.output_file, "/output/path_temp_step1.raw")
         self.assertEqual(s1.backend_tool, "ewfexport")
-        self.assertEqual(s1.command_template_tokens, ["ewfexport", "-t", "{output_no_ext}", "-f", "raw", "{input}"])
-        self.assertEqual(s1.command_args, ["ewfexport", "-t", "/output/path_temp_step1", "-f", "raw", "/input/path.e01"])
+        self.assertEqual(s1.command_template_tokens, ["ewfexport", "-u", "-t", "{output_no_ext}", "-f", "raw", "{input}"])
+        self.assertEqual(s1.command_args, ["ewfexport", "-u", "-t", "/output/path_temp_step1", "-f", "raw", "/input/path.e01"])
         self.assertTrue(s1.is_intermediate)
         self.assertFalse(s1.experimental)
         self.assertEqual(s1.risk, PathRisk.STABLE)
@@ -491,6 +491,7 @@ class TestToolRunner(unittest.TestCase):
 
         cmd = [
             "ewfexport",
+            "-u",
             "-t",
             "C:/Users/RSG/Downloads/New folder/2020JimmyWilson_converted_temp_step1",
             "-f",

@@ -184,7 +184,7 @@ class ConversionRegistry:
             source=FileFormat.E01,
             target=FileFormat.RAW,
             backend_tool="ewfexport",
-            command_template_tokens=["ewfexport", "-t", "{output_no_ext}", "-f", "raw", "{input}"],
+            command_template_tokens=["ewfexport", "-u", "-t", "{output_no_ext}", "-f", "raw", "{input}"],
             experimental=False,
             notes="Stable EWF export to RAW image.",
             weight=1.0
@@ -204,7 +204,7 @@ class ConversionRegistry:
             source=FileFormat.EX01,
             target=FileFormat.RAW,
             backend_tool="ewfexport",
-            command_template_tokens=["ewfexport", "-t", "{output_no_ext}", "-f", "raw", "{input}"],
+            command_template_tokens=["ewfexport", "-u", "-t", "{output_no_ext}", "-f", "raw", "{input}"],
             experimental=True,
             notes="Experimental EWF2 export to RAW image.",
             weight=10.0

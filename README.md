@@ -37,8 +37,18 @@ select a target output format, choose an output directory, and run the conversio
 pipeline. Enable **Dry Run Mode** to validate the planned operation and print
 the exact commands without modifying files.
 
-Before running a conversion, install the required backend tools or place their
-Windows executables in the local `tools/` directory:
+Before running a conversion, install the required backend tools into the local
+`tools/` directory:
+
+```powershell
+.\setup_tools.ps1
+```
+
+The script installs `qemu-img` through winget, downloads Windows x64 ewftools,
+copies the required executables/DLLs into `tools/`, and writes a local
+`tools/TOOLS_MANIFEST.txt` with SHA-256 hashes for provenance.
+
+At minimum, the app requires:
 
 ```text
 tools/ewfexport.exe
@@ -46,7 +56,9 @@ tools/qemu-img.exe
 ```
 
 Dry Run Mode checks these dependencies before execution. E01 and Ex01 inputs
-require `ewfexport`; virtual disk conversions require `qemu-img`.
+require `ewfexport`; virtual disk conversions require `qemu-img`. External tool
+binaries are intentionally gitignored and must be installed locally before
+running conversions or packaging a release.
 
 The B.R.I.D.G.E. logo is bundled into the GUI header, About dialog, GitHub guide,
 and Windows executable icon through:

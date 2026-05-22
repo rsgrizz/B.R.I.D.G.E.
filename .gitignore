@@ -25,8 +25,9 @@ build/
 # Logs (runtime only - not committed)
 logs/
 
-# External tools (place binaries here manually - not committed)
-tools/
+# External tools (place binaries here manually or run setup_tools.ps1)
+tools/*
+!tools/.gitkeep
 
 # Test & coverage artifacts
 .coverage

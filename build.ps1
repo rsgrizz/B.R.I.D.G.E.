@@ -41,7 +41,23 @@ if (Test-Path $DistDir) {
 Write-Host "Running complete automated test suite..." -ForegroundColor Cyan
 python -m unittest discover -s tests -v
 
-# 4. Run PyInstaller packaging
+# 4. Verify external tool payload before packaging
+Write-Host "Verifying external tool payload..." -ForegroundColor Cyan
+$RequiredTools = @(
+    (Join-Path $PSScriptRoot "tools\ewfexport.exe"),
+    (Join-Path $PSScriptRoot "tools\qemu-img.exe")
+)
+$MissingTools = @($RequiredTools | Where-Object { -not (Test-Path $_) })
+if ($MissingTools.Count -gt 0) {
+    Write-Host "[ERROR]: Missing required external tool binaries:" -ForegroundColor Red
+    foreach ($Tool in $MissingTools) {
+        Write-Host "  - $Tool" -ForegroundColor Red
+    }
+    Write-Host "Run .\setup_tools.ps1, then rerun .\build.ps1." -ForegroundColor Yellow
+    exit 1
+}
+
+# 5. Run PyInstaller packaging
 Write-Host "Invoking PyInstaller packaging (One Directory Mode)..." -ForegroundColor Green
 pyinstaller --clean BRIDGE.spec
 
@@ -61,7 +77,7 @@ if (-not (Test-Path $DistAssetsDir)) {
 }
 Copy-Item -Path (Join-Path $PSScriptRoot "app\assets\*") -Destination $DistAssetsDir -Recurse -Force
 
-# 5. Verify the package output structure
+# 6. Verify the package output structure
 $PackagedExe = Join-Path $PSScriptRoot "dist\BRIDGE\BRIDGE.exe"
 $PackagedTools = Join-Path $PSScriptRoot "dist\BRIDGE\tools"
 $PackagedAssets = Join-Path $PSScriptRoot "dist\BRIDGE\app\assets"

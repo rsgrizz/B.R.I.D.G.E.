@@ -22,6 +22,7 @@ from app.core.models import (
 )
 from app.core.conversion_service import ConversionService
 from app.core.tool_runner import ToolRunner
+from app.utils.paths import AppPaths
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +228,7 @@ class PreflightValidator:
                         ))
 
         # ---- 9. Required external tool validation ----------------------
+        tools_dir = AppPaths.get_tools_dir()
         for tool_name in PreflightValidator._required_tools(plan):
             if not ToolRunner.resolve_tool_path(tool_name):
                 messages.append(ValidationMessage(
@@ -234,8 +236,8 @@ class PreflightValidator:
                     code=ValidationCode.REQUIRED_TOOL_MISSING,
                     message=(
                         f"Required external tool not found: {tool_name}. "
-                        f"Place {tool_name}.exe in the local tools folder or install "
-                        "the tool so it is available on PATH."
+                        f"Run setup_tools.ps1 or place {tool_name}.exe and its runtime "
+                        f"DLLs in: {tools_dir}"
                     ),
                 ))
 

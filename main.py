@@ -9,6 +9,15 @@ import sys
 import logging
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
+from app.utils.app_identity import (
+    APP_DISPLAY_NAME,
+    APP_GUID,
+    APP_ORGANIZATION_DOMAIN,
+    APP_ORGANIZATION_NAME,
+    APP_USER_MODEL_ID,
+    APP_VERSION,
+    apply_windows_app_user_model_id,
+)
 from app.utils.logging_config import setup_logging
 from app.utils.paths import AppPaths
 from app.ui.main_window import MainWindow
@@ -22,13 +31,17 @@ def main():
     and launching Qt UI event loops.
     """
     logger.info("Initializing B.R.I.D.G.E. system lifecycle...")
+    apply_windows_app_user_model_id()
     
     app = QApplication(sys.argv)
     
     # Configure application metadata
-    app.setApplicationName("B.R.I.D.G.E.")
-    app.setApplicationVersion("1.0.0")
-    app.setOrganizationName("Randy Grizzelli")
+    app.setApplicationName(APP_DISPLAY_NAME)
+    app.setApplicationVersion(APP_VERSION)
+    app.setOrganizationName(APP_ORGANIZATION_NAME)
+    app.setOrganizationDomain(APP_ORGANIZATION_DOMAIN)
+    app.setDesktopFileName(APP_USER_MODEL_ID)
+    app.setProperty("applicationGuid", APP_GUID)
 
     icon_path = AppPaths.get_asset_path("bridge.ico")
     if icon_path.exists():

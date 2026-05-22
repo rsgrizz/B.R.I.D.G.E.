@@ -168,6 +168,13 @@ Runtime logs are written to:
 dist/BRIDGE/logs/bridge.log
 ```
 
+The packaged Windows app uses a fixed desktop identity for stable taskbar
+grouping and icon behavior:
+
+```text
+{8F0F83F6-33B4-4B07-9D2A-C6C8AF4F3117}
+```
+
 ### Run The Packaged Application
 
 ```powershell

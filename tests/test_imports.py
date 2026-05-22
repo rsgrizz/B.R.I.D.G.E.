@@ -34,6 +34,7 @@ from app.core.conversion_registry import ConversionRegistry
 from app.core.tool_runner import ToolRunner
 from app.core.hash_service import HashService
 from app.core.preflight_validator import PreflightValidator
+from app.utils.app_identity import APP_GUID, APP_USER_MODEL_ID
 from app.utils.paths import AppPaths
 
 class TestScaffoldWiring(unittest.TestCase):
@@ -61,6 +62,11 @@ class TestScaffoldWiring(unittest.TestCase):
         
         logs_dir = AppPaths.get_logs_dir()
         self.assertTrue(logs_dir.exists())
+
+    def test_fixed_application_identity(self):
+        """The desktop app identity must remain stable across packaged builds."""
+        self.assertEqual(APP_GUID, "{8F0F83F6-33B4-4B07-9D2A-C6C8AF4F3117}")
+        self.assertIn("BRIDGE", APP_USER_MODEL_ID)
 
     def test_registry_populated(self):
         """Verifies that the Conversion Registry initializes with standard conversion edges."""

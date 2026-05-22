@@ -67,38 +67,44 @@ class MainWindow(QMainWindow):
         """Applies a premium, high-contrast dark-mode cyber-forensics stylesheet."""
         self.setStyleSheet("""
             QMainWindow {
-                background-color: #0f172a;
+                background-color: #0b1220;
             }
             QWidget {
-                color: #f1f5f9;
+                color: #e5e7eb;
                 font-family: "Segoe UI", -apple-system, sans-serif;
                 font-size: 13px;
             }
             QLabel {
+                color: #e5e7eb;
                 font-weight: 500;
             }
             QFrame#container {
-                background-color: #1e293b;
-                border: 1px solid #334155;
+                background-color: #182235;
+                border: 1px solid #3b4a63;
                 border-radius: 8px;
             }
             QFrame#divider {
-                background-color: #334155;
+                background-color: #3b4a63;
                 max-height: 1px;
             }
             QLineEdit {
-                background-color: #0f172a;
-                border: 1px solid #475569;
+                background-color: #101827;
+                border: 1px solid #64748b;
                 border-radius: 4px;
                 padding: 6px 10px;
-                color: #f8fafc;
+                color: #f9fafb;
+                selection-background-color: #06b6d4;
+                selection-color: #06121f;
+                placeholder-text-color: #9ca3af;
             }
             QLineEdit:focus {
                 border: 1px solid #06b6d4;
+                background-color: #0f1b2d;
             }
             QLineEdit:read-only {
-                background-color: #1e293b;
-                color: #94a3b8;
+                background-color: #202b3f;
+                border: 1px solid #4b5d78;
+                color: #cbd5e1;
             }
             QPushButton {
                 background-color: #0284c7;
@@ -143,23 +149,37 @@ class MainWindow(QMainWindow):
                 background-color: #334155;
             }
             QComboBox {
-                background-color: #0f172a;
-                border: 1px solid #475569;
+                background-color: #101827;
+                border: 1px solid #64748b;
                 border-radius: 4px;
                 padding: 5px 10px;
-                color: #f8fafc;
+                color: #f9fafb;
+                selection-background-color: #06b6d4;
+                selection-color: #06121f;
             }
             QComboBox:focus {
                 border: 1px solid #06b6d4;
             }
+            QComboBox QAbstractItemView {
+                background-color: #101827;
+                border: 1px solid #64748b;
+                color: #f9fafb;
+                selection-background-color: #164e63;
+                selection-color: #ffffff;
+            }
             QTextEdit {
-                background-color: #0f172a;
-                border: 1px solid #334155;
+                background-color: #101827;
+                border: 1px solid #4b5d78;
                 border-radius: 6px;
                 padding: 8px;
                 font-family: "Consolas", "JetBrains Mono", monospace;
                 font-size: 12px;
-                color: #e2e8f0;
+                color: #f8fafc;
+                selection-background-color: #06b6d4;
+                selection-color: #06121f;
+            }
+            QTextEdit:focus {
+                border: 1px solid #06b6d4;
             }
             QProgressBar {
                 background-color: #1e293b;
@@ -189,9 +209,9 @@ class MainWindow(QMainWindow):
                 border: 1px solid #06b6d4;
             }
             QStatusBar {
-                background-color: #0f172a;
-                border-top: 1px solid #334155;
-                color: #94a3b8;
+                background-color: #0b1220;
+                border-top: 1px solid #3b4a63;
+                color: #cbd5e1;
             }
         """)
 

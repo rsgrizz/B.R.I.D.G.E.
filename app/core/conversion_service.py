@@ -9,6 +9,7 @@ import logging
 import shutil
 from pathlib import Path
 from app.core.models import ConversionPlan
+from app.core.tool_runner import ToolRunner
 
 logger = logging.getLogger(__name__)
 
@@ -65,9 +66,10 @@ class ConversionService:
         report.append("")
         
         for step in plan.steps:
+            command_args = ToolRunner.normalize_command_args(step.command_args)
             report.append(f"Step {step.step_num}: {step.source_format.value} ➔ {step.target_format.value}")
-            report.append(f"  Tool to execute: {step.command_args[0]}")
-            report.append(f"  Command line: {' '.join(step.command_args)}")
+            report.append(f"  Tool to execute: {command_args[0]}")
+            report.append(f"  Command line: {' '.join(command_args)}")
             report.append(f"  Input:  {step.input_file}")
             report.append(f"  Output: {step.output_file}")
             report.append(f"  Is Intermediate: {step.is_intermediate}")

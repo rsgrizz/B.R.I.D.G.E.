@@ -80,8 +80,9 @@ class ConversionWorker(QThread):
                     f"<b>[SYSTEM]: Beginning Step {step.step_num}/{total_steps} "
                     f"({step.source_format.value} ➔ {step.target_format.value})</b>"
                 )
+                command_args = ToolRunner.normalize_command_args(step.command_args)
                 self.log_received.emit(
-                    f"<font color='#94a3b8'>[CMD]: {' '.join(step.command_args)}</font>"
+                    f"<font color='#94a3b8'>[CMD]: {' '.join(command_args)}</font>"
                 )
 
                 # Base progress offset for this step (each step is an equal slice of 0-100)
@@ -98,11 +99,11 @@ class ConversionWorker(QThread):
                         self.progress_updated.emit(global_pct)
 
                 logger.info(
-                    f"Executing step {step.step_num} command: {' '.join(step.command_args)}"
+                    f"Executing step {step.step_num} command: {' '.join(command_args)}"
                 )
 
                 result: ToolExecutionResult = ToolRunner.run_command(
-                    step.command_args,
+                    command_args,
                     local_log_cb,
                     self.cancel_event
                 )

@@ -320,7 +320,10 @@ class PreflightValidator:
 
         if plan is not None:
             plan_report = ConversionService.generate_dry_run_report(plan)
-            planned_commands = [list(step.command_args) for step in plan.steps]
+            planned_commands = [
+                ToolRunner.normalize_command_args(step.command_args)
+                for step in plan.steps
+            ]
 
         return DryRunResult(
             validation=validation,

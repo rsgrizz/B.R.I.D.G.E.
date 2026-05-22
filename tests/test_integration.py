@@ -92,6 +92,44 @@ class TestConversionWorkerIntegration(unittest.TestCase):
         self.assertNotIn("conversion_failed", event_types)
         self.assertNotIn("cancelled", event_types)
 
+    def test_worker_logs_and_runs_normalized_windows_paths(self):
+        """Worker [CMD] logs and executed commands use Windows-safe path separators."""
+        plan = ConversionPlanner.plan_conversion(
+            FileFormat.E01,
+            FileFormat.VMDK,
+            input_path="C:/Users/RSG/Downloads/2020JimmyWilson.E01",
+            output_path="C:/Users/RSG/Downloads/New folder/2020JimmyWilson_converted.vmdk",
+        )
+        worker = ConversionWorker(plan)
+
+        logs = []
+        commands = []
+        worker.log_received.connect(logs.append)
+
+        def mock_run(cmd, log_cb, cancel_event):
+            commands.append(cmd)
+            return ToolExecutionResult(
+                exit_code=0,
+                stdout="",
+                stderr="",
+                elapsed_time_seconds=0.1,
+                success=True,
+                cancelled=False,
+            )
+
+        with patch('app.workers.conversion_worker.ToolRunner.run_command', side_effect=mock_run):
+            worker.run()
+
+        self.assertTrue(
+            any(
+                "[CMD]:" in log
+                and r"C:\Users\RSG\Downloads\2020JimmyWilson.E01" in log
+                for log in logs
+            ),
+            msg=f"Expected normalized source path in command logs, got: {logs}",
+        )
+        self.assertIn(r"C:\Users\RSG\Downloads\2020JimmyWilson.E01", commands[0])
+
     def test_step2_failure_emits_failed_not_success(self):
         """Step 2 failure emits conversion_failed and suppresses success emission."""
         plan = ConversionPlanner.plan_conversion(

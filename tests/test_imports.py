@@ -480,6 +480,42 @@ class TestToolRunner(unittest.TestCase):
         self.assertIn("Error: Invalid header", self.logs)
         self.assertIn("[STDERR]: Detailed error description", self.logs)
 
+    def test_run_command_normalizes_windows_paths_before_launch(self):
+        """Windows drive paths are converted before Popen receives command args."""
+        mock_proc = MagicMock()
+        mock_proc.poll.return_value = 0
+        mock_proc.returncode = 0
+        mock_proc.wait.return_value = 0
+        mock_proc.stdout = io.StringIO("")
+        mock_proc.stderr = io.StringIO("")
+
+        cmd = [
+            "ewfexport",
+            "-t",
+            "C:/Users/RSG/Downloads/New folder/2020JimmyWilson_converted_temp_step1",
+            "-f",
+            "raw",
+            "C:/Users/RSG/Downloads/2020JimmyWilson.E01",
+        ]
+
+        with patch(
+            "app.core.tool_runner.ToolRunner.resolve_tool_path",
+            return_value="C:/tools/ewfexport.exe",
+        ), patch("subprocess.Popen", return_value=mock_proc) as mock_popen:
+            result = ToolRunner.run_command(cmd, self.log_callback, self.cancel_event)
+
+        self.assertTrue(result.success)
+        called_cmd = mock_popen.call_args[0][0]
+        self.assertEqual(called_cmd[0], r"C:\tools\ewfexport.exe")
+        self.assertIn(
+            r"C:\Users\RSG\Downloads\New folder\2020JimmyWilson_converted_temp_step1",
+            called_cmd,
+        )
+        self.assertIn(
+            r"C:\Users\RSG\Downloads\2020JimmyWilson.E01",
+            called_cmd,
+        )
+
     @patch("subprocess.Popen")
     def test_run_command_immediate_cancel(self, mock_popen):
         """Checks that active cancellation events skip invocation altogether."""

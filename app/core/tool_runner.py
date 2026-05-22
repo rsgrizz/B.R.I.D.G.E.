@@ -12,6 +12,7 @@ import shutil
 import threading
 import queue
 import os
+import ntpath
 from threading import Event
 from typing import Callable, List
 from app.core.models import ToolExecutionResult
@@ -51,6 +52,38 @@ class ToolRunner:
         return None
 
     @staticmethod
+    def normalize_command_args(cmd: List[str]) -> List[str]:
+        """Normalize Windows path tokens while preserving command structure."""
+        if not cmd:
+            return []
+
+        return [cmd[0]] + [ToolRunner._normalize_external_arg(arg) for arg in cmd[1:]]
+
+    @staticmethod
+    def _normalize_external_arg(arg: str) -> str:
+        """Convert Windows-looking path tokens to backslash form for CLI tools.
+
+        Qt commonly returns ``C:/...`` paths on Windows. libewf tools apply
+        extended-path handling internally and reject mixed ``C:\\/...`` paths, so
+        normalize those tokens at the final subprocess boundary.
+        """
+        if not arg:
+            return arg
+
+        stripped = arg.strip('"')
+        if ToolRunner._is_windows_path_token(stripped):
+            return ntpath.normpath(stripped)
+
+        return arg
+
+    @staticmethod
+    def _is_windows_path_token(token: str) -> bool:
+        """Return True when a command token is a drive or UNC path."""
+        is_drive_path = len(token) >= 3 and token[1] == ":" and token[2] in ("/", "\\")
+        is_unc_path = token.startswith(("//", "\\\\"))
+        return is_drive_path or is_unc_path
+
+    @staticmethod
     def run_command(cmd: List[str], log_callback: Callable[[str], None], cancel_event: Event) -> ToolExecutionResult:
         """Executes a command list inside a background subprocess.
         Periodically intercepts output streams and monitors cancellation flags.
@@ -70,7 +103,8 @@ class ToolRunner:
                 exit_code=-1, stdout="", stderr="", elapsed_time_seconds=0.0, success=False, cancelled=True
             )
 
-        tool_name = cmd[0]
+        command_args = ToolRunner.normalize_command_args(cmd)
+        tool_name = command_args[0]
         resolved_path = ToolRunner.resolve_tool_path(tool_name)
 
         # Fall back to command raw executable if both failed (let system try to invoke it)
@@ -79,7 +113,8 @@ class ToolRunner:
             resolved_path = tool_name
 
         # Construct final resolved command list
-        resolved_cmd = [resolved_path] + cmd[1:]
+        resolved_path = ToolRunner._normalize_external_arg(resolved_path)
+        resolved_cmd = [resolved_path] + command_args[1:]
         logger.info(f"Preparing to run subprocess: {' '.join(resolved_cmd)}")
         
         stdout_accumulator = []

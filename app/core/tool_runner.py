@@ -25,6 +25,32 @@ class ToolRunner:
     """
 
     @staticmethod
+    def resolve_tool_path(tool_name: str) -> str | None:
+        """Resolve a tool name from the bundled tools directory or host PATH."""
+        tools_dir = AppPaths.get_tools_dir()
+
+        candidates = [tool_name]
+        if os.name == 'nt' and not tool_name.lower().endswith(".exe"):
+            candidates.append(f"{tool_name}.exe")
+
+        for cand in candidates:
+            local_path = tools_dir / cand
+            if local_path.is_file():
+                return str(local_path)
+
+        resolved_path = shutil.which(tool_name)
+        if resolved_path:
+            return resolved_path
+
+        if os.name == 'nt':
+            for cand in candidates:
+                resolved_path = shutil.which(cand)
+                if resolved_path:
+                    return resolved_path
+
+        return None
+
+    @staticmethod
     def run_command(cmd: List[str], log_callback: Callable[[str], None], cancel_event: Event) -> ToolExecutionResult:
         """Executes a command list inside a background subprocess.
         Periodically intercepts output streams and monitors cancellation flags.
@@ -45,29 +71,7 @@ class ToolRunner:
             )
 
         tool_name = cmd[0]
-        tools_dir = AppPaths.get_tools_dir()
-        
-        # Resolve tool path: check local tools folder first
-        candidates = [tool_name]
-        if os.name == 'nt' and not tool_name.lower().endswith(".exe"):
-            candidates.append(f"{tool_name}.exe")
-            
-        resolved_path = None
-        for cand in candidates:
-            local_path = tools_dir / cand
-            if local_path.is_file():
-                resolved_path = str(local_path)
-                break
-                
-        # If not found locally, search host system PATH
-        if not resolved_path:
-            resolved_path = shutil.which(tool_name)
-            if not resolved_path and os.name == 'nt':
-                for cand in candidates:
-                    res = shutil.which(cand)
-                    if res:
-                        resolved_path = res
-                        break
+        resolved_path = ToolRunner.resolve_tool_path(tool_name)
 
         # Fall back to command raw executable if both failed (let system try to invoke it)
         if not resolved_path:

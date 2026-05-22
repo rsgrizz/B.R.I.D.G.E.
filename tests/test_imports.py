@@ -732,6 +732,12 @@ class TestPreflightValidator(unittest.TestCase):
             input_path="/fake/source.raw",
             output_path="/fake/dest/output.vmdk",
         )
+        self.tool_resolver_patch = patch(
+            "app.core.preflight_validator.ToolRunner.resolve_tool_path",
+            return_value="C:/tools/mock-tool.exe",
+        )
+        self.mock_resolve_tool_path = self.tool_resolver_patch.start()
+        self.addCleanup(self.tool_resolver_patch.stop)
 
     def _make_source(self, content: bytes = b"\x00" * 1024) -> str:
         """Creates a temporary source file and registers cleanup."""
@@ -844,6 +850,57 @@ class TestPreflightValidator(unittest.TestCase):
         self.assertFalse(result.overwrite_required)
         codes = [m.code for m in result.messages]
         self.assertNotIn(ValidationCode.OUTPUT_ALREADY_EXISTS, codes)
+
+    # ------------------------------------------------------------------
+    # External tool checks
+    # ------------------------------------------------------------------
+
+    def test_missing_required_tool_returns_error(self):
+        """REQUIRED_TOOL_MISSING error when a planned backend binary is unavailable."""
+        src = self._make_source()
+        dest = self._make_dest_dir()
+        self.mock_resolve_tool_path.return_value = None
+
+        result = PreflightValidator.validate(self.plan, src, dest, "out.vmdk")
+
+        error_codes = [m.code for m in result.errors]
+        self.assertIn(ValidationCode.REQUIRED_TOOL_MISSING, error_codes)
+        self.assertFalse(result.passed)
+        self.assertTrue(
+            any("qemu-img" in m.message for m in result.errors),
+            msg=f"Expected qemu-img missing-tool message, got: {result.errors}",
+        )
+
+    def test_ewf_pipeline_reports_missing_ewfexport_before_execution(self):
+        """Dry run catches missing ewfexport for E01 pipelines before subprocess execution."""
+        src = self._make_source(b"EVF\x09\x0d\x0a\xff\x00" + b"x" * 1024)
+        dest = self._make_dest_dir()
+        output_path = str(Path(dest) / "out.vmdk")
+        plan = ConversionPlanner.plan_conversion(
+            FileFormat.E01,
+            FileFormat.VMDK,
+            input_path=src,
+            output_path=output_path,
+        )
+
+        def resolve_tool(tool_name):
+            if tool_name == "ewfexport":
+                return None
+            return f"C:/tools/{tool_name}.exe"
+
+        self.mock_resolve_tool_path.side_effect = resolve_tool
+
+        with patch("subprocess.Popen") as mock_popen:
+            dry = PreflightValidator.dry_run(plan, src, dest, "out.vmdk")
+            mock_popen.assert_not_called()
+
+        self.assertFalse(dry.passed)
+        error_codes = [m.code for m in dry.validation.errors]
+        self.assertIn(ValidationCode.REQUIRED_TOOL_MISSING, error_codes)
+        self.assertTrue(
+            any("ewfexport" in m.message for m in dry.validation.errors),
+            msg=f"Expected ewfexport missing-tool message, got: {dry.validation.errors}",
+        )
 
     # ------------------------------------------------------------------
     # Disk space checks

@@ -21,6 +21,7 @@ from app.core.models import (
     ValidationSeverity,
 )
 from app.core.conversion_service import ConversionService
+from app.core.tool_runner import ToolRunner
 
 logger = logging.getLogger(__name__)
 
@@ -225,7 +226,20 @@ class PreflightValidator:
                             ),
                         ))
 
-        # ---- 9. Disk space check ---------------------------------------
+        # ---- 9. Required external tool validation ----------------------
+        for tool_name in PreflightValidator._required_tools(plan):
+            if not ToolRunner.resolve_tool_path(tool_name):
+                messages.append(ValidationMessage(
+                    severity=ValidationSeverity.ERROR,
+                    code=ValidationCode.REQUIRED_TOOL_MISSING,
+                    message=(
+                        f"Required external tool not found: {tool_name}. "
+                        f"Place {tool_name}.exe in the local tools folder or install "
+                        "the tool so it is available on PATH."
+                    ),
+                ))
+
+        # ---- 10. Disk space check --------------------------------------
         space_estimate: Optional[EstimatedSpaceRequirement] = None
         check_path = dest or (output_path.parent if output_path else None)
 
@@ -382,3 +396,18 @@ class PreflightValidator:
                 return os.access(candidate, os.W_OK)
             candidate = candidate.parent
         return False
+
+    @staticmethod
+    def _required_tools(plan: ConversionPlan) -> list[str]:
+        """Return unique backend tools required by a conversion plan."""
+        tools: list[str] = []
+        seen: set[str] = set()
+
+        for step in plan.steps:
+            tool_name = step.backend_tool or (step.command_args[0] if step.command_args else "")
+            tool_name = tool_name.strip()
+            if tool_name and tool_name not in seen:
+                seen.add(tool_name)
+                tools.append(tool_name)
+
+        return tools

@@ -37,6 +37,17 @@ select a target output format, choose an output directory, and run the conversio
 pipeline. Enable **Dry Run Mode** to validate the planned operation and print
 the exact commands without modifying files.
 
+Before running a conversion, install the required backend tools or place their
+Windows executables in the local `tools/` directory:
+
+```text
+tools/ewfexport.exe
+tools/qemu-img.exe
+```
+
+Dry Run Mode checks these dependencies before execution. E01 and Ex01 inputs
+require `ewfexport`; virtual disk conversions require `qemu-img`.
+
 The B.R.I.D.G.E. logo is bundled into the GUI header, About dialog, GitHub guide,
 and Windows executable icon through:
 
